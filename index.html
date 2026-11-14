@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Simulador didático de irrigação com inferência fuzzy Mamdani.">
+    <title>IrrigaFuzzy — controlador Mamdani</title>
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <main class="conteudo pagina">
+      <header class="cabecalho">
+        <p class="sobretitulo">Inteligência artificial · Sistemas fuzzy</p>
+        <h1>IrrigaFuzzy</h1>
+        <p>Simulador Mamdani para recomendar o tempo de irrigação a partir da umidade do solo e da temperatura.</p>
+        <a class="link-secundario" href="tests.html">Ver testes de validação</a>
+      </header>
+
+      <section class="cartao configuracao" aria-labelledby="titulo-configuracao">
+        <div class="titulo-secao">
+          <div>
+            <p class="sobretitulo">01 · Configuração</p>
+            <h2 id="titulo-configuracao">Entradas e regras</h2>
+          </div>
+          <button id="restaurar" class="botao botao-neutro" type="button">Restaurar padrão</button>
+        </div>
+
+        <div class="grade-entradas">
+          <fieldset class="campo-entrada">
+            <legend>Umidade do solo</legend>
+            <div class="valor-com-unidade">
+              <input id="umidade-numero" type="number" min="0" max="100" step="1" value="35" aria-label="Umidade do solo em porcentagem">
+              <span>%</span>
+            </div>
+            <input id="umidade" type="range" min="0" max="100" step="1" value="35" aria-label="Deslizador de umidade do solo">
+            <div class="limites"><span>0%</span><span>100%</span></div>
+          </fieldset>
+
+          <fieldset class="campo-entrada">
+            <legend>Temperatura</legend>
+            <div class="valor-com-unidade">
+              <input id="temperatura-numero" type="number" min="10" max="40" step="1" value="30" aria-label="Temperatura em graus Celsius">
+              <span>°C</span>
+            </div>
+            <input id="temperatura" type="range" min="10" max="40" step="1" value="30" aria-label="Deslizador de temperatura">
+            <div class="limites"><span>10 °C</span><span>40 °C</span></div>
+          </fieldset>
+
+          <label class="campo-entrada campo-passo" for="delta-z">
+            <span class="rotulo-campo">Passo de defuzzificação Δz</span>
+            <select id="delta-z">
+              <option value="0.1" selected>0,1 minuto</option>
+              <option value="0.05">0,05 minuto</option>
+              <option value="0.01">0,01 minuto</option>
+            </select>
+            <span class="ajuda-campo">Método do centróide por pontos médios.</span>
+          </label>
+        </div>
+
+        <details class="regras-configuraveis">
+          <summary>Consequentes das nove regras</summary>
+          <p>Os antecedentes permanecem fixos. Selecione o consequente fuzzy para cada regra.</p>
+          <div id="regras" class="grade-regras"></div>
+        </details>
+
+        <div class="acoes">
+          <button id="calcular" class="botao botao-principal" type="button">Calcular</button>
+          <button id="avancar" class="botao botao-secundario" type="button" disabled>Avançar etapa</button>
+          <p id="mensagem" class="mensagem aviso" role="status" aria-live="polite">Os valores iniciais seguem o enunciado: U = 35% e T = 30 °C.</p>
+        </div>
+      </section>
+
+      <section class="cartao painel-resultado" aria-labelledby="titulo-resultado">
+        <div class="titulo-secao">
+          <div>
+            <p class="sobretitulo">02 · Inferência</p>
+            <h2 id="titulo-resultado">Acompanhe as cinco etapas</h2>
+          </div>
+          <div class="valor-final" aria-live="polite">
+            <span>Tempo recomendado</span>
+            <strong id="resultado">—</strong>
+          </div>
+        </div>
+        <ol id="etapas" class="etapas" aria-label="Etapas da inferência fuzzy">
+          <li data-etapa="0">Fuzzificação</li>
+          <li data-etapa="1">Regras</li>
+          <li data-etapa="2">Implicação</li>
+          <li data-etapa="3">Agregação</li>
+          <li data-etapa="4">Defuzzificação</li>
+        </ol>
+        <div id="detalhe-etapa" class="detalhe-etapa">
+          <p class="estado-vazio">Calcule para ver graus de pertinência, regras ativadas e os cálculos intermediários.</p>
+        </div>
+      </section>
+
+      <section class="cartao graficos" aria-labelledby="titulo-graficos">
+        <div class="titulo-secao">
+          <div>
+            <p class="sobretitulo">03 · Visualização</p>
+            <h2 id="titulo-graficos">Conjuntos fuzzy</h2>
+          </div>
+          <p class="nota-grafico">Linhas verticais indicam as entradas; a região verde representa a saída agregada.</p>
+        </div>
+        <div class="grade-graficos">
+          <figure>
+            <figcaption>Umidade do solo</figcaption>
+            <canvas id="grafico-umidade" class="grafico" role="img" aria-label="Gráfico dos conjuntos fuzzy de umidade"></canvas>
+            <div id="grafico-umidade-legenda" class="legenda" aria-label="Legenda do gráfico de umidade"></div>
+          </figure>
+          <figure>
+            <figcaption>Temperatura</figcaption>
+            <canvas id="grafico-temperatura" class="grafico" role="img" aria-label="Gráfico dos conjuntos fuzzy de temperatura"></canvas>
+            <div id="grafico-temperatura-legenda" class="legenda" aria-label="Legenda do gráfico de temperatura"></div>
+          </figure>
+          <figure class="grafico-saida">
+            <figcaption>Tempo de irrigação e saída agregada</figcaption>
+            <canvas id="grafico-saida" class="grafico" role="img" aria-label="Gráfico dos conjuntos de saída e da agregação Mamdani"></canvas>
+            <div id="grafico-saida-legenda" class="legenda" aria-label="Legenda do gráfico de saída"></div>
+          </figure>
+        </div>
+      </section>
+
+      <footer>
+        <p>Inferência Mamdani implementada em JavaScript puro: mínimo (E), corte, máximo e centróide numérico.</p>
+      </footer>
+    </main>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

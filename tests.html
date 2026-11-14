@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Testes do sistema fuzzy</title>
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body class="pagina-testes">
+    <main class="conteudo pagina">
+      <a class="voltar" href="index.html">← Voltar ao simulador</a>
+      <header class="cabecalho">
+        <p class="sobretitulo">Validação</p>
+        <h1>Testes do motor fuzzy</h1>
+        <p>Casos automatizados do enunciado, executados no navegador sem bibliotecas externas.</p>
+      </header>
+      <section class="cartao">
+        <p id="resumo-testes" role="status" aria-live="polite">Executando testes…</p>
+        <ol id="lista-testes" class="lista-testes"></ol>
+      </section>
+    </main>
+    <script type="module">
+      import { executarTestes } from "./js/tests.js";
+
+      const resultados = executarTestes();
+      const lista = document.querySelector("#lista-testes");
+      for (const resultado of resultados) {
+        const item = document.createElement("li");
+        item.className = resultado.ok ? "teste-ok" : "teste-falhou";
+        item.textContent = resultado.ok
+          ? `✓ ${resultado.nome}`
+          : `✗ ${resultado.nome}: ${resultado.erro}`;
+        lista.append(item);
+      }
+      const aprovados = resultados.filter((resultado) => resultado.ok).length;
+      const resumo = document.querySelector("#resumo-testes");
+      resumo.textContent = `${aprovados} de ${resultados.length} casos aprovados.`;
+      resumo.className = aprovados === resultados.length ? "mensagem sucesso" : "mensagem erro";
+    </script>
+  </body>
+</html>
