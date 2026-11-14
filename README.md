@@ -25,4 +25,4 @@ Abra `tests.html` para conferir as pertinências de referência, os extremos dos
 
 ## Autoria
 
-Preencha aqui os nomes dos integrantes do grupo antes da entrega.
+Luidge de Sousa Carvalho, Samuel Lucas Alves Matos
