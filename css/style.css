@@ -585,3 +585,34 @@ footer {
     white-space: nowrap;
   }
 }
+
+.links-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+}
+
+.tabela-dados tr.regra-ativa td {
+  background: #e3f4ef;
+  font-weight: 600;
+}
+
+.seletor-regra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.seletor-regra select {
+  font: inherit;
+  padding: 4px 8px;
+}
+
+.log-etapa {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  font-size: 0.92rem;
+}

@@ -37,6 +37,7 @@ const elementos = {
 
 let resultadoAtual = null;
 let etapaAtual = -1;
+let regraSelecionada = null; // regra exibida em destaque na etapa de implicação
 
 function criarSeletorDeRegras() {
   for (const regra of REGRAS_PADRAO) {
@@ -76,7 +77,7 @@ function formatarGrau(valor) {
   return formatar(valor, 4);
 }
 
-function montarTabela(cabecalhos, linhas, legenda) {
+function montarTabela(cabecalhos, linhas, legenda, classesLinhas = []) {
   const tabela = document.createElement("table");
   tabela.className = "tabela-dados";
   if (legenda) {
@@ -96,15 +97,16 @@ function montarTabela(cabecalhos, linhas, legenda) {
   thead.append(linhaCabecalho);
 
   const tbody = document.createElement("tbody");
-  for (const linha of linhas) {
+  linhas.forEach((linha, indiceLinha) => {
     const tr = document.createElement("tr");
+    if (classesLinhas[indiceLinha]) tr.className = classesLinhas[indiceLinha];
     for (const valor of linha) {
       const celula = document.createElement("td");
       celula.textContent = String(valor);
       tr.append(celula);
     }
     tbody.append(tr);
-  }
+  });
   tabela.append(thead, tbody);
   return tabela;
 }
@@ -218,6 +220,15 @@ function desenharGrafico(canvas, configuracao) {
       else contexto.lineTo(x, y);
     });
     contexto.stroke();
+    if (serie.preenchido) {
+      const ultimo = serie.pontos[serie.pontos.length - 1];
+      contexto.lineTo(xTela(ultimo.x), yTela(0));
+      contexto.lineTo(xTela(serie.pontos[0].x), yTela(0));
+      contexto.closePath();
+      contexto.globalAlpha = 0.22;
+      contexto.fillStyle = serie.cor;
+      contexto.fill();
+    }
     contexto.restore();
   }
 
@@ -319,27 +330,47 @@ function desenharGraficoSaida(modo) {
   };
 
   if (modo === "implicacao") {
+    const recorte = (regra) => {
+      const conjunto = CONJUNTOS.tempo[regra.consequente];
+      return Array.from({ length: 301 }, (_, amostra) => {
+        const x = amostra / 10;
+        return { x, y: Math.min(regra.ativacao, pertinencia(x, conjunto)) };
+      });
+    };
+    const selecionada = resultadoAtual.regras.find((regra) => regra.id === regraSelecionada);
     configuracao.series = [
-      ...series.map((serie) => ({ ...serie, opacidade: 0.4, largura: 1.5 })),
+      ...series.map((serie) => ({ ...serie, opacidade: 0.3, largura: 1.2 })),
+      // demais regras ativadas: recortes tracejados, mais claros
       ...resultadoAtual.regras
-        .filter((regra) => regra.ativacao > 0)
-        .map((regra, indice) => {
-          const conjunto = CONJUNTOS.tempo[regra.consequente];
-          return {
-            nome: `${regra.id} recortada`,
-            cor: CORES[indice],
-            tracejado: true,
-            largura: 1.7,
-            pontos: Array.from({ length: 301 }, (_, amostra) => {
-              const x = amostra / 10;
-              return {
-                x,
-                y: Math.min(regra.ativacao, pertinencia(x, conjunto)),
-              };
-            }),
-          };
-        }),
+        .filter((regra) => regra.ativacao > 0 && regra !== selecionada)
+        .map((regra) => ({
+          nome: `${regra.id} recortada (h = ${formatarGrau(regra.ativacao)})`,
+          cor: CORES[Number(regra.id.slice(1)) - 1],
+          tracejado: true,
+          largura: 1.4,
+          opacidade: 0.6,
+          pontos: recorte(regra),
+        })),
     ];
+    if (selecionada) {
+      const original = CONJUNTOS.tempo[selecionada.consequente];
+      configuracao.series.push(
+        {
+          nome: `${selecionada.id}: consequente original (${NOMES_CONJUNTOS[selecionada.consequente]})`,
+          cor: "#14283d",
+          largura: 2,
+          tracejado: true,
+          pontos: Array.from({ length: 301 }, (_, amostra) => ({ x: amostra / 10, y: pertinencia(amostra / 10, original) })),
+        },
+        {
+          nome: `${selecionada.id}: recorte em h = ${formatarGrau(selecionada.ativacao)}`,
+          cor: "#d34b65",
+          largura: 3,
+          preenchido: true,
+          pontos: recorte(selecionada),
+        },
+      );
+    }
   } else {
     configuracao.agregacao = resultadoAtual;
   }
@@ -388,14 +419,16 @@ function renderizarEtapa() {
       regra.id,
       `${NOMES_CONJUNTOS[regra.umidade]} (${formatarGrau(regra.grauUmidade)})`,
       `${NOMES_CONJUNTOS[regra.temperatura]} (${formatarGrau(regra.grauTemperatura)})`,
-      `mínimo = ${formatarGrau(regra.ativacao)}`,
+      `min(${formatarGrau(regra.grauUmidade)}; ${formatarGrau(regra.grauTemperatura)}) = ${formatarGrau(regra.ativacao)}`,
+      NOMES_CONJUNTOS[regra.consequente],
       regra.ativacao > 0 ? "Ativada" : "Não ativada",
     ]);
     secao.append(
       montarTabela(
-        ["Regra", "Antecedente: umidade", "Antecedente: temperatura", "Ativação h(r)", "Estado"],
+        ["Regra", "Antecedente: umidade", "Antecedente: temperatura", "Ativação h(r)", "Consequente", "Estado"],
         linhas,
-        "Avaliação completa das nove regras",
+        "Avaliação completa das nove regras (regras ativadas em destaque)",
+        resultadoAtual.regras.map((regra) => (regra.ativacao > 0 ? "regra-ativa" : "")),
       ),
     );
     desenharGraficoSaida("agregacao");
@@ -404,10 +437,47 @@ function renderizarEtapa() {
       regra.id,
       formatarGrau(regra.ativacao),
       NOMES_CONJUNTOS[regra.consequente],
-      regra.ativacao > 0 ? `μrecortada(z) = min(${formatarGrau(regra.ativacao)}, μconsequente(z))` : "Sem contribuição",
+      regra.ativacao > 0 ? `μrecortada(z) = min(${formatarGrau(regra.ativacao)}; μ${NOMES_CONJUNTOS[regra.consequente]}(z))` : "Sem contribuição (h = 0)",
     ]);
+
+    // Seleção de uma regra para ver o consequente original e o recorte.
+    if (!resultadoAtual.regras.some((regra) => regra.id === regraSelecionada)) {
+      regraSelecionada = (resultadoAtual.regras.find((regra) => regra.ativacao > 0) ?? resultadoAtual.regras[0]).id;
+    }
+    const caixa = document.createElement("label");
+    caixa.className = "seletor-regra";
+    caixa.append(document.createTextNode("Regra selecionada no gráfico:"));
+    const seletor = document.createElement("select");
+    for (const regra of resultadoAtual.regras) {
+      const opcao = document.createElement("option");
+      opcao.value = regra.id;
+      opcao.textContent = `${regra.id} → ${NOMES_CONJUNTOS[regra.consequente]} (h = ${formatarGrau(regra.ativacao)})`;
+      seletor.append(opcao);
+    }
+    seletor.value = regraSelecionada;
+    seletor.addEventListener("change", () => {
+      regraSelecionada = seletor.value;
+      desenharGraficoSaida("implicacao");
+    });
+    caixa.append(seletor);
+
+    const log = document.createElement("ul");
+    log.className = "log-etapa";
+    for (const regra of resultadoAtual.regras.filter((r) => r.ativacao > 0)) {
+      const item = document.createElement("li");
+      item.textContent = `${regra.id}: min(${formatarGrau(regra.grauUmidade)}; ${formatarGrau(regra.grauTemperatura)}) = ${formatarGrau(regra.ativacao)}; consequente ${NOMES_CONJUNTOS[regra.consequente]} recortado em ${formatarGrau(regra.ativacao)}.`;
+      log.append(item);
+    }
+
     secao.append(
-      montarTabela(["Regra", "Ativação", "Consequente original", "Implicação"], linhas),
+      montarTabela(
+        ["Regra", "Ativação", "Consequente original", "Implicação"],
+        linhas,
+        undefined,
+        resultadoAtual.regras.map((regra) => (regra.ativacao > 0 ? "regra-ativa" : "")),
+      ),
+      caixa,
+      log,
     );
     desenharGraficoSaida("implicacao");
   } else if (etapaAtual === 3) {
@@ -422,6 +492,12 @@ function renderizarEtapa() {
         "Pontos de conferência da agregação",
       ),
     );
+    const ativos = resultadoAtual.regras.filter((regra) => regra.ativacao > 0);
+    const nomesConsequentes = [...new Set(ativos.map((regra) => NOMES_CONJUNTOS[regra.consequente]))];
+    const nota = document.createElement("p");
+    nota.className = "log-etapa";
+    nota.textContent = `Agregação: máximo, ponto a ponto, entre os recortes de ${nomesConsequentes.join(", ")} (${ativos.map((regra) => regra.id).join(", ")}). As áreas não são somadas: regras com o mesmo consequente e a mesma altura não elevam a saída.`;
+    secao.append(nota);
     desenharGraficoSaida("agregacao");
   } else {
     secao.append(
@@ -436,6 +512,10 @@ function renderizarEtapa() {
         "Defuzzificação por pontos médios",
       ),
     );
+    const nota = document.createElement("p");
+    nota.className = "log-etapa";
+    nota.textContent = `Centroide: z* = Σ[z(k) · μagregada(z(k))] / Σ[μagregada(z(k))], com z(k) = (k + 0,5) · Δz e N = ${Math.round(30 / resultadoAtual.deltaZ)} pontos → ${formatar(resultadoAtual.centroide, 6)} min (exibido: ${formatar(resultadoAtual.centroide)} min).`;
+    secao.append(nota);
     desenharGraficoSaida("defuzzificacao");
   }
 
@@ -462,23 +542,26 @@ function consequentesSelecionados() {
   );
 }
 
-function lerNumero(campo, nome) {
+function lerNumero(campo, nome, unidade) {
+  const Nome = nome.charAt(0).toUpperCase() + nome.slice(1);
   const valor = campo.value.trim();
-  if (valor === "") throw new TypeError(`Informe ${nome}.`);
+  // Em <input type="number">, texto não numérico chega como "" com validity.badInput.
+  if (campo.validity && campo.validity.badInput) throw new TypeError(`${Nome}: digite um número válido.`);
+  if (valor === "") throw new TypeError(`${Nome}: o campo está vazio.`);
   const numero = Number(valor);
-  if (!Number.isFinite(numero)) throw new TypeError(`${nome} deve ser um número.`);
+  if (!Number.isFinite(numero)) throw new TypeError(`${Nome}: digite um número válido.`);
   const minimo = Number(campo.min);
   const maximo = Number(campo.max);
   if (numero < minimo || numero > maximo) {
-    throw new RangeError(`${nome} deve estar entre ${minimo} e ${maximo}.`);
+    throw new RangeError(`${Nome} deve estar entre ${minimo}${unidade} e ${maximo}${unidade} (valor informado: ${valor}${unidade}).`);
   }
   return numero;
 }
 
 function calcular() {
   try {
-    const umidade = lerNumero(elementos.umidadeNumero, "a umidade");
-    const temperatura = lerNumero(elementos.temperaturaNumero, "a temperatura");
+    const umidade = lerNumero(elementos.umidadeNumero, "umidade do solo", "%");
+    const temperatura = lerNumero(elementos.temperaturaNumero, "temperatura", " °C");
     resultadoAtual = inferir({
       umidade,
       temperatura,
@@ -494,14 +577,15 @@ function calcular() {
   } catch (erro) {
     elementos.mensagem.textContent = erro.message;
     elementos.mensagem.className = "mensagem erro";
-    elementos.umidadeNumero.setAttribute("aria-invalid", String(erro.message.includes("umidade")));
-    elementos.temperaturaNumero.setAttribute("aria-invalid", String(erro.message.includes("temperatura")));
+    elementos.umidadeNumero.setAttribute("aria-invalid", String(/umidade/i.test(erro.message)));
+    elementos.temperaturaNumero.setAttribute("aria-invalid", String(/temperatura/i.test(erro.message)));
   }
 }
 
 function invalidarResultado() {
   resultadoAtual = null;
   etapaAtual = -1;
+  regraSelecionada = null;
   elementos.resultado.textContent = "—";
   elementos.avancar.disabled = true;
   elementos.avancar.textContent = "Avançar etapa";
